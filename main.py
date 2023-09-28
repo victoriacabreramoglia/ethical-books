@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 import ipdb
 import openai
+import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from PIL import Image
@@ -70,7 +71,7 @@ class ChildrenBookCreator:
 
 def call_gpt(messages_list):
     return openai.ChatCompletion.create(
-        model="gpt-4",
+        model="gpt-3.5-turbo",
         messages=messages_list,
         temperature=.8,
     )["choices"][0]["message"]["content"]
@@ -84,6 +85,10 @@ if __name__ == "__main__":
     openai.organization = OPENAI_ORG_ID
     openai.api_key = OPENAI_API_KEY
     # /initial setup
+
+    # system: instructions for the machine. "how" you want it to respond. ex from documentation: "When I ask for help to write something, you will reply with a document that contains at least one joke or playful comment in every paragraph."
+    # assistant: chaptgpt character. what we're telling chatgpt that chatgpt said. need to provide all context of conversation history in each call
+    # user: user character. what we're telling chatgpt that the user said
 
     STORY_PROMPT = "A young samurai goes on a journey to prove himself."
     story_outline = call_gpt(
@@ -133,25 +138,41 @@ if __name__ == "__main__":
     for beat in story_beats:
         print(beat)
     prompts = []
-    urls = []
-    for beat in story_beats:
-        image_resp = openai.Image.create(
-            prompt=story_vibe + beat, n=1, size="1024x1024", response_format="b64_json"
-        )
+    images_captions = []
+
+    # Define a unique variable (using timestamp) for file output and create the output directory structure
+    timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    output_directory = os.path.join("OUTPUT", timestamp, "RAW_PDFS")
+    os.makedirs(output_directory, exist_ok=True)
+
+
+    # go though each beat of the story. generate a user-facing caption and image
+    for index, beat in enumerate(story_beats[0:3]): # run just the first one for dev purposes. delete [0:1] eventually
+        print("\nloop iteration: " + str(index))
+        print("\nstory_vibe + beat: \n" + story_vibe + beat)
+
         caption = call_gpt(
             [
-                {
-                    "role": "system",
-                    "content": "You are a professional children's book author creating material for a publishing house. You are going to receive a story outline, a specific scene, and a description of what's going on in that scene. Write the text that would go in a children's book alongside the image. Keep it to a about 4 sentences. One sentence should be expository, telling us what is happening in the narrative. Remind us the overall narrative of the story pretty explicitly Include dialogue every once in a while.",
-                },
-                {
-                    "role": "user",
-                    "content": "Outline: " + story_outline + "Current Beat: " + beat,
-                },
+                {"role": "system", "content": "You are a professional children's book author creating material for a publishing house. You are going to receive a Story Outline and a Current Scene Description of what's going on in one specific scene. Write the text that would go in a children's book alongside the image for the Current Scene. Keep it to 1-2 sentences. One sentence should be expository, telling us what is happening in the narrative in this scene. Include dialogue every once in a while. Do not include anything except your 1-2 sentences about the current scene. Only include the caption for the current scene in your response. "},
+                {"role": "user", "content": "Story Outline: " + story_outline + "\nCurrent Scene: " + beat}
             ]
         )
-        image_string = image_resp["data"][0]["b64_json"]
-        urls.append({"image": image_string, "caption": caption})
-    output_path = "books/15.pdf"
-    book_creator = ChildrenBookCreator(urls, output_path)
-    book_creator.create_book()
+        print("\ncaption generated in loop " + str(index) + " :\n" + caption)
+
+
+        image_resp = openai.Image.create(prompt=story_vibe + beat, n=1, size="1024x1024", response_format = 'b64_json')
+        image_string = image_resp['data'][0]['b64_json']
+
+        # Decode the base64-encoded string and save it as an image file
+        image_data = base64.b64decode(image_string)
+        image_filename = os.path.join(output_directory, f"{index}.png")
+        with open(image_filename, "wb") as image_file:
+            image_file.write(image_data)
+        
+        images_captions.append(
+            {
+                "image_file":image_filename,
+                "caption": caption
+            }
+        )
+    ipdb.set_trace() #opens command line debugger before program exits
