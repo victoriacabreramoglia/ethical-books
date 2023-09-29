@@ -91,6 +91,8 @@ if __name__ == "__main__":
     # user: user character. what we're telling chatgpt that the user said
 
     STORY_PROMPT = "A young samurai goes on a journey to prove himself."
+    #STORY_PROMPT = "A little girl named Sabryna and her cat named Mr. Cat enjoy a day at the pumpkin patch."
+    NUM_SCENES = 5 # 5 images/minute seems to be DALL-E limit until we look further into it
     story_outline = call_gpt(
         [
             {
@@ -105,7 +107,7 @@ if __name__ == "__main__":
         [
             {
                 "role": "system",
-                "content": "You are a professional children's book author creating material for a publishing house. You are going to receive a story concept. Turn it into 12 scenes that could be illustrated in a children's book. Each scene should be a sentence or two, and you should focus on describing the protagonist of the story and what they are doing in the scene.Start with the word scene, and separate each scene with the word scene. Each time, briefly describe each character in three or four words based on the story outline. Say what kind of creature they are. ALways describe the character in the words in the character description from the narrative outline.",
+                "content": "You are a professional children's book author creating material for a publishing house. You are going to receive a story concept. Turn it into " + str(NUM_SCENES) + " scenes that could be illustrated in a children's book. Each scene should be a sentence or two, and you should focus on describing the protagonist of the story and what they are doing in the scene.Start with the word scene, and separate each scene with the word scene. Each time, briefly describe each character in three or four words based on the story outline. Say what kind of creature they are. Always describe the character in the words in the character description from the narrative outline.",
             },
             {"role": "user", "content": story_outline},
         ]
@@ -114,7 +116,7 @@ if __name__ == "__main__":
         [
             {
                 "role": "system",
-                "content": "You are a professional children's book author creating material for a publishing house. You are going to receive a story concept. Turn it into 12 scenes that could be illustrated in a children's book. Each scene should be a sentence or two, and you should focus on describing the protagonist of the story and what they are doing in the scene.Start with the word scene, and separate each scene with the word scene. Each time, briefly describe each character in three or four words based on the story outline. Say what kind of creature they are. ALways describe the character in the words in the character description from the narrative outline.",
+                "content": "You are a professional children's book author creating material for a publishing house. You are going to receive a story concept. Turn it into " + str(NUM_SCENES) + " scenes that could be illustrated in a children's book. Each scene should be a sentence or two, and you should focus on describing the protagonist of the story and what they are doing in the scene.Start with the word scene, and separate each scene with the word scene. Each time, briefly describe each character in three or four words based on the story outline. Say what kind of creature they are. Always describe the character in the words in the character description from the narrative outline.",
             },
             {"role": "user", "content": story_outline},
             {"role": "system", "content": story_beats},
@@ -124,6 +126,26 @@ if __name__ == "__main__":
             },
         ]
     )
+    story_beats = story_beats.split("Scene")[1:]
+    story_beats_string = ""
+    print("\nStory beats:")
+    for beat in story_beats:
+        print(beat)
+        story_beats_string += beat + "\n"
+    story_captions = call_gpt(
+        [
+            {
+                "role": "system",
+                "content": "You are a professional children's book author creating material for a publishing house. You are going to receive a list of scene descriptions that make up the plot of the book. Please rewrite these descriptions in a happy, child-friendly, playful voice in simple vocabulary. Keep it expositional so we know what is happening in the scene. Include dialogue every once in a while. If the items in the list begin with numbers, remove them. If the items in the list begin with titles like ""Introduction"", remove them. This output is what is going to be shown to the reader and should include nothing but the scene descriptions separated only by a new line.",
+            },
+                {"role": "user", "content": "List of scene descriptions: " + story_beats_string}
+        ]
+    )
+    print("\nstory_captions string: \n" + story_captions)
+    story_captions = story_captions.split("\n\n")
+    print("\nstory_captions string split into array:")
+    for caption in story_captions:
+        print(caption)
     # story_vibe = call_gpt(
     #     [
     #         {
@@ -134,9 +156,6 @@ if __name__ == "__main__":
     #     ]
     # )
     story_vibe ="Anime. Cel-shaded. Digital ink. Japanese."
-    story_beats = story_beats.split("Scene")[1:]
-    for beat in story_beats:
-        print(beat)
     prompts = []
     images_captions = []
 
@@ -146,21 +165,12 @@ if __name__ == "__main__":
     os.makedirs(output_directory, exist_ok=True)
 
 
-    # go though each beat of the story. generate a user-facing caption and image
-    for index, beat in enumerate(story_beats[0:3]): # run just the first one for dev purposes. delete [0:1] eventually
+    # go though each scene of the story. generate a user-facing caption and image
+    for index, scene in enumerate(story_captions):
         print("\nloop iteration: " + str(index))
-        print("\nstory_vibe + beat: \n" + story_vibe + beat)
+        print("\nscene: " + scene)
 
-        caption = call_gpt(
-            [
-                {"role": "system", "content": "You are a professional children's book author creating material for a publishing house. You are going to receive a Story Outline and a Current Scene Description of what's going on in one specific scene. Write the text that would go in a children's book alongside the image for the Current Scene. Keep it to 1-2 sentences. One sentence should be expository, telling us what is happening in the narrative in this scene. Include dialogue every once in a while. Do not include anything except your 1-2 sentences about the current scene. Only include the caption for the current scene in your response. "},
-                {"role": "user", "content": "Story Outline: " + story_outline + "\nCurrent Scene: " + beat}
-            ]
-        )
-        print("\ncaption generated in loop " + str(index) + " :\n" + caption)
-
-
-        image_resp = openai.Image.create(prompt=story_vibe + beat, n=1, size="1024x1024", response_format = 'b64_json')
+        image_resp = openai.Image.create(prompt=story_vibe + " " + scene, n=1, size="1024x1024", response_format = 'b64_json')
         image_string = image_resp['data'][0]['b64_json']
 
         # Decode the base64-encoded string and save it as an image file
@@ -172,7 +182,7 @@ if __name__ == "__main__":
         images_captions.append(
             {
                 "image":image_string,
-                "caption": caption
+                "caption": scene
             }
         )
 
