@@ -171,8 +171,11 @@ if __name__ == "__main__":
         
         images_captions.append(
             {
-                "image_file":image_filename,
+                "image":image_string,
                 "caption": caption
             }
         )
-    ipdb.set_trace() #opens command line debugger before program exits
+
+    output_path = os.path.join(output_directory, f"{timestamp}.pdf")
+    book_creator = ChildrenBookCreator(images_captions, output_path)
+    book_creator.create_book()
